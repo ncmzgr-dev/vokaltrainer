@@ -1421,6 +1421,8 @@ function toggleRecording() {
     stopPlayback();
     endCountIn(run);
     setStatus('');
+    // Eine haengende Mikrofon-Anfrage darf den naechsten Versuch nicht blockieren.
+    if (!Sound.frame()) Sound.closeMic();
   } else startRecording();
 }
 
