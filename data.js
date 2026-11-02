@@ -156,25 +156,32 @@ const CHART = {
   'ɑ': [.97, 1], 'ɔ': [.97, .62], o: [.97, .35], 'ʊ': [.8, .18], u: [.98, .02],
 };
 
-// Lautschrift im Klartext. en und de sind die Woerter fuer die Hoerprobe.
+// Lautschrift im Klartext. en und de sind genaue Beispielwoerter und dienen auch der Hoerprobe.
+// nearDe ist eine nur ungefaehre Entsprechung fuer die Anzeige. hint ist die Merkhilfe fuer neue Zeichen.
 const IPA = {
-  i: { like: '„Biene“', de: 'Biene', en: 'see', tip: 'Lang und gespannt' },
-  y: { like: '„über“', de: 'über', tip: 'Zunge wie bei i, Lippen rund' },
-  'ɪ': { like: '„Mitte“', de: 'Mitte', en: 'sit', tip: 'Kurz und locker' },
-  'ʏ': { like: '„Hütte“', de: 'Hütte', tip: 'Zunge wie bei ɪ, Lippen rund' },
-  e: { like: '„Beet“', de: 'Beet', tip: 'Geschlossenes e' },
-  'ø': { like: '„schön“', de: 'schön', tip: 'Zunge wie bei e, Lippen rund' },
-  'ɛ': { like: '„Bett“', de: 'Bett', en: 'bed', tip: 'Offenes e' },
-  'œ': { like: '„können“', de: 'können', tip: 'Zunge wie bei ɛ, Lippen rund' },
-  'æ': { like: 'englisch „cat“', en: 'cat', tip: 'Zwischen „Bett“ und „Bad“, Zunge flach und vorn' },
-  a: { like: '„Mann“', de: 'Mann', tip: 'Helles a' },
-  'ɝ': { like: 'englisch „her“', en: 'her', tip: 'Zunge zurück, Lippen locker, kein ö' },
-  'ʌ': { like: 'englisch „love“', en: 'love', tip: 'Wie „Kamm“, nur kürzer und zentraler' },
-  'ɑ': { like: '„Vater“, nur dunkler', de: 'Vater', en: 'father', tip: 'Offen und hinten' },
-  'ɔ': { like: '„Sonne“', de: 'Sonne', en: 'law', tip: 'Offen, wenig Rundung' },
-  o: { like: '„Boot“', de: 'Boot', tip: 'Geschlossen und rund' },
-  'ʊ': { like: '„Mutter“', de: 'Mutter', en: 'book', tip: 'Kurz und locker' },
-  u: { like: '„Buch“', de: 'Buch', en: 'you', tip: 'Lang und rund' },
+  i: { de: 'Biene', en: 'see', tip: 'Lang und gespannt' },
+  y: { de: 'über', tip: 'Zunge wie bei i, Lippen rund' },
+  'ɪ': { de: 'Mitte', en: 'sit', tip: 'Kurz und locker', hint: 'Ein kleines großes I: kurzes i' },
+  'ʏ': { de: 'Hütte', tip: 'Zunge wie bei ɪ, Lippen rund', hint: 'Ein kleines großes Y: kurzes ü' },
+  e: { de: 'Beet', tip: 'Geschlossenes e' },
+  'ø': { de: 'schön', tip: 'Zunge wie bei e, Lippen rund', hint: 'Ein durchgestrichenes o: langes ö' },
+  'ɛ': { de: 'Bett', en: 'bed', tip: 'Offenes e', hint: 'Wie das Euro-Zeichen: offenes e' },
+  'œ': { de: 'können', tip: 'Zunge wie bei ɛ, Lippen rund', hint: 'o und e verschmolzen: offenes ö' },
+  'æ': { nearDe: 'Bär', en: 'cat', tip: 'Zwischen „Bett“ und „Mann“, Zunge flach und vorn', hint: 'a und e verschmolzen: klingt auch dazwischen' },
+  a: { de: 'Mann', tip: 'Helles a' },
+  'ɝ': { en: 'her', tip: 'Zunge zurück, Lippen locker, kein ö', hint: 'Eine gespiegelte 3 mit Haken: Der Haken ist das R' },
+  'ʌ': { nearDe: 'Kamm', en: 'love', tip: 'Wie „Kamm“, nur kürzer und zentraler', hint: 'Ein umgedrehtes v: kurzes, dunkles a' },
+  'ɑ': { nearDe: 'Vater', en: 'father', tip: 'Offen und hinten, dunkler als „Vater“', hint: 'Das runde a aus der Handschrift: dunkles a' },
+  'ɔ': { de: 'Sonne', en: 'law', tip: 'Offen, wenig Rundung', hint: 'Ein o mit Lücke: offenes o' },
+  o: { de: 'Boot', tip: 'Geschlossen und rund' },
+  'ʊ': { de: 'Mutter', en: 'book', tip: 'Kurz und locker', hint: 'Ein Hufeisen, ein u mit Öffnung: kurzes u' },
+  u: { de: 'Buch', en: 'you', tip: 'Lang und rund' },
+};
+
+// Deutsche Klanghilfe zu den gesungenen Vokalen. Fuer ɝ gibt es keine brauchbare Entsprechung.
+const VOWEL_DE = {
+  i: 'Biene', I: 'Mitte', E: 'Bett', ae: '≈ Bär', A: '≈ Vater', O: 'Sonne', U: 'Mutter', u: 'Buch', V: '≈ Kamm',
+  eI: '≈ Beet', oU: '≈ Boot', aI: 'Mai', aU: 'Haus', OI: 'Heu', Ir: '≈ Bier', Er2: '≈ Bär', Ar: '≈ Bart', Or: '≈ Ohr', aIr: '≈ Feier',
 };
 
 // Grobe maennliche Formantwerte F1, F2, F3 in Hz fuer die synthetischen Hoerbeispiele.

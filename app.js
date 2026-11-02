@@ -18,7 +18,7 @@ const DAY = 86400000;
 
 const STORE_KEY = 'vokaltrainer.v1';
 const DEFAULT_SESSION = { preset: 'soft', zone: 'z2', minutes: 10, group: 'all', drone: false, warmup: true, pattern: 'slide' };
-const DEFAULT_SETTINGS = { volume: 60, timbre: 'bright', deviceId: '', autoplay: true, introDone: false, livePitch: false };
+const DEFAULT_SETTINGS = { volume: 60, timbre: 'bright', deviceId: '', autoplay: true, introDone: false, livePitch: false, notation: 'both', exampleDe: false };
 const MAX_LOG = 200;
 let storageOk = true;
 
@@ -193,10 +193,12 @@ function describeTarget(to) {
   const [sym, ...rest] = String(to).trim().split(/\s+/);
   const parts = [...sym].filter((c) => IPA[c]);
   if (!parts.length) return '';
-  const named = parts.map((c) => `${c} wie ${IPA[c].like}`);
-  const main = named.length > 1 ? `Zwischen ${named.join(' und ')}` : named[0];
+  const wordsOnly = notation() === 'words';
+  const named = parts.map((c) => (wordsOnly ? likeWord(c) : `${c} wie ${likeWord(c)}`));
+  const main = named.length > 1 ? `Zwischen ${named.join(' und ')}` : `${wordsOnly ? 'Wie ' : ''}${named[0]}`;
+  const tip = parts.length === 1 ? ` ${glossProse(IPA[parts[0]].tip)}.` : '';
   const extra = rest.map((w) => DESCRIPTORS[w]).filter(Boolean).join(' ');
-  return `${main}.${extra ? ` ${extra}` : ''}`;
+  return `${main}.${tip}${extra ? ` ${extra}` : ''}`;
 }
 
 /* ---------- Vokaltrapez ---------- */
@@ -221,9 +223,12 @@ function chartSvg(vowel, preset, zone) {
   const path = stops.map((p) => p.join(',')).join(' ');
   const labels = Object.keys(CHART).map((s) => {
     const [x, y] = chartPoint(s);
+    if (notation() === 'words') return `<circle cx="${x}" cy="${y}" r="${s === vowel.start ? 4 : 1.5}" class="${s === vowel.start ? 'ch-from-dot' : 'ch-dot'}"/>`;
     const cls = s === vowel.start ? 'ch-from' : 'ch-sym';
     return `<text x="${x}" y="${y + 4}" class="${cls}" text-anchor="middle">${s}</text>`;
   }).join('');
+  const moved = end && Math.hypot(end[0] - from[0], end[1] - from[1]) > 6;
+  const tags = notation() === 'ipa' ? '' : `${moved || !end ? chartTag(from, vowelExample(vowel), 'muted') : ''}${end && parseSound(to).known ? chartTag(end, soundWords(to), 'accent') : ''}`;
   let line = '';
   if (end && Math.hypot(end[0] - from[0], end[1] - from[1]) > 6) {
     const d = Math.hypot(end[0] - from[0], end[1] - from[1]);
@@ -241,15 +246,25 @@ function chartSvg(vowel, preset, zone) {
     <text x="4" y="22" class="ch-axis">zu</text>
     <text x="90" y="182" class="ch-axis">offen</text>
     <polyline points="${path}" class="ch-path"/>
-    ${dot}${ring}${line}${labels}
+    ${dot}${ring}${line}${labels}${tags}
   </svg>`;
+}
+
+// Beschriftung im Trapez: unter dem Punkt, damit oben die Achsen frei bleiben. Ganz unten rueckt sie darueber.
+function chartTag([x, y], text, cls) {
+  const anchor = x < 110 ? 'start' : x > 230 ? 'end' : 'middle';
+  const ly = y > 150 ? y - 16 : y + 24;
+  return `<text x="${x}" y="${ly}" text-anchor="${anchor}" class="ch-tag ${cls}">${esc(text)}</text>`;
 }
 
 function glideBar(vowel, to) {
   if (!vowel.glide) return '';
+  const words = notation() !== 'ipa' && parseSound(to).known;
+  const hold = words ? soundWords(to) : to.split(' ')[0];
+  const end = words && IPA[vowel.glide] ? soundWord(vowel.glide) : vowel.glide;
   return `<div>
-    <div class="glide" role="img" aria-label="Fast die ganze Note auf ${esc(to)}, ${vowel.glide} erst ganz am Ende">
-      <span class="hold">${esc(to.split(' ')[0])} halten</span><span class="end">${vowel.glide}</span>
+    <div class="glide" role="img" aria-label="Fast die ganze Note auf ${esc(hold)}, ${esc(end)} erst ganz am Ende">
+      <span class="hold">${esc(hold)} halten</span><span class="end">${esc(end)}</span>
     </div>
   </div>`;
 }
@@ -284,6 +299,7 @@ function render() {
   const running = !!run && !run.finished;
   nav.hidden = !!run;
   document.body.classList.toggle('running', running);
+  document.body.dataset.notation = notation();
   nav.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-current', b.dataset.view === view ? 'page' : 'false'));
   const sel = $('profile-select');
   sel.innerHTML = state.profiles.map((p) => `<option value="${p.id}"${p.id === state.activeId ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
@@ -347,7 +363,7 @@ function setupView() {
       <div class="preset-grid">
         ${PRESETS.map((pr) => presetCard(pr, p, s.preset)).join('')}
       </div>
-      <p class="small muted preset-detail">${presetById(s.preset).direction}. Etwa wie ${presetById(s.preset).examples}.</p>
+      <p class="small muted preset-detail">${glossProse(presetById(s.preset).direction)}. Etwa wie ${presetById(s.preset).examples}.</p>
     </div>
     <div class="setup-row">
       <div>
@@ -368,11 +384,12 @@ function setupView() {
         <h2 class="label">Heute dran (${queue.length})</h2>
         <span class="muted small">${rated} von ${VOWELS.length} Vokalen in dieser Kombination bewertet</span>
       </div>
+      ${notationControls('s')}
       <ul class="queue">
         ${queue.map((id) => {
     const v = vowelById(id);
     const r = p.ratings[cellKey(id, s.preset, s.zone)];
-    return `<li><span class="ipa">${v.ipa}</span><span class="muted small">${v.word}</span><span class="to ipa">${esc(target(v, s.preset, s.zone))}</span>${ratingMark(r)}</li>`;
+    return `<li>${vowelSymbol(v)}<span class="muted small">${vowelWord(v)}</span><span class="to">${soundHtml(target(v, s.preset, s.zone))}</span>${ratingMark(r)}</li>`;
   }).join('')}
       </ul>
     </div>
@@ -394,7 +411,7 @@ function presetCard(pr, p, active) {
     <strong>${pr.name}</strong>
     <span class="small muted">${pr.songs}</span>
     <span class="small muted preset-more">Etwa wie ${pr.examples}</span>
-    <span class="small ipa-inline preset-more">${pr.direction}</span>
+    <span class="small ipa-inline preset-more">${glossProse(pr.direction)}</span>
     <span class="meters">${meter(lv.cry, 'Cry')}${meter(lv.twang, 'Twang')}</span>
   </label>`;
 }
@@ -459,7 +476,7 @@ function enterSpot(spot) {
 
 function stepInstruction(vowel, to) {
   const word = `<b>${esc(run.word || vowel.word)}</b>`;
-  const target = `<span class="ipa">${esc(to)}</span>`;
+  const target = soundInline(to);
   const note = noteName(run.midi);
   switch (stepId()) {
     case 'spoken':
@@ -467,7 +484,7 @@ function stepInstruction(vowel, to) {
     case 'slide': {
       const pattern = currentPattern();
       const way = pattern.offsets ? `von ${noteName(run.midi + pattern.offsets[0])} bis ${note}` : `von ${noteName(run.midi - 5)} nach ${note}`;
-      return `Singe ${word} ${way}. ${pattern.text} Wandle den Vokal unterwegs allmählich von <span class="ipa">${vowel.ipa}</span> zu ${target}.`;
+      return `Singe ${word} ${way}. ${pattern.text} Wandle den Vokal unterwegs allmählich von ${vowelInline(vowel)} zu ${target}.`;
     }
     case 'word':
       return `Setze ${word} direkt auf ${note} an und halte den Ton. Der Zielvokal steht vom Einsatz an. Zur Probe: einmal mit Originalvokal, einmal modifiziert.`;
@@ -531,9 +548,9 @@ function practiceView() {
     <div class="practice-grid">
       <div class="target-panel target-head">
         <div class="target-line">
-          <span class="big-ipa">${vowel.ipa}</span>
+          ${bigSound(vowel.ipa, vowelExample(vowel, spot ? spot.word : vowel.word))}
           <span class="arrow" aria-hidden="true">→</span>
-          <span class="big-ipa accent">${esc(to)}</span>
+          ${bigSound(to, parseSound(to).known ? soundWords(to) : '', true)}
         </div>
         ${plain ? `<p class="target-plain">${plain}</p>` : ''}
         <div class="words">
@@ -545,6 +562,7 @@ function practiceView() {
           <button class="ghost small" data-action="hear-target">Ziel</button>
           <button class="ghost small" data-action="hear-path">Weg</button>
         </div>
+        ${exampleSwitch()}
       </div>
       <div class="work-panel">
         <ol class="stepper">
@@ -559,7 +577,7 @@ function practiceView() {
         <ul class="cues small">
           <li>${CRY_CUES[lv.cry]}</li>
           <li>${TWANG_CUES[lv.twang]}</li>
-          <li>${esc(vowel.note)}</li>
+          <li>${glossProse(esc(vowel.note))}</li>
           <li>Bleibt unterscheidbar: ${vowel.pair}.</li>
           ${override && override.note ? `<li class="own"><b>Deine Notiz:</b> ${esc(override.note)}</li>` : ''}
         </ul>
@@ -629,6 +647,7 @@ function workPanel(vowel, to) {
         <label class="check"><input type="checkbox" id="live-pitch"${set.livePitch ? ' checked' : ''}> Tonhöhe auch ohne Aufnahme zeigen</label>` : ''}
         <label class="check"><input type="checkbox" name="set-autoplay"${set.autoplay ? ' checked' : ''}> Take nach der Aufnahme direkt abspielen</label>
         ${toneControls('opt')}
+        <div class="field-inline"><span>Lautschrift anzeigen</span>${radios('opt-notation', NOTATIONS, notation())}</div>
         <div class="row"><button class="ghost small" data-action="check">Technik prüfen</button></div>
       </div>
     </details>`;
@@ -670,7 +689,7 @@ function summaryView() {
     <ul class="queue">
       ${done.map((d) => {
     const v = vowelById(d.id);
-    return `<li><span class="ipa">${v.ipa}</span><span class="muted small">${esc(d.word || v.word)} auf ${noteName(d.midi)}</span><span class="to ipa">${esc(d.to || target(v, run.preset, run.zone))}</span>${ratingMark({ r: d.r })}</li>`;
+    return `<li>${vowelSymbol(v)}<span class="muted small">${esc(d.word || v.word)} auf ${noteName(d.midi)}</span><span class="to">${soundHtml(d.to || target(v, run.preset, run.zone))}</span>${ratingMark({ r: d.r })}</li>`;
   }).join('') || '<li class="muted small">Keine Bewertung abgegeben.</li>'}
     </ul>
     <ul class="warm-list">
@@ -701,7 +720,9 @@ function matrixView() {
       </div>
       <div>
         ${radios('m-zone', ['z1', 'z2'].map((z) => ({ value: z, label: `${ZONE_NAMES[z]} ${zoneLabel(z)}` })), matrixZone)}
+        ${notationControls('m')}
         <p class="small muted legend">${rated} von ${total} bewertet · ${RATINGS.map((r) => `<span class="mark r${r.id}">${r.mark}</span> ${r.name}`).join(' · ')}</p>
+        ${notation() === 'ipa' ? '' : '<p class="small muted">≈ heißt ungefähr. „dt.“ und „engl.“ stehen dort, wo es in der gewählten Sprache kein passendes Wort gibt.</p>'}
       </div>
     </div>
     <div class="table-wrap">
@@ -710,12 +731,12 @@ function matrixView() {
         ${groups.map((g) => `<tbody>
           <tr class="group-row"><th colspan="5" scope="colgroup">${g.name}</th></tr>
           ${VOWELS.filter((v) => v.group === g.id).map((v) => `<tr>
-            <th scope="row"><span class="ipa">${v.ipa}</span> <span class="small muted">${v.word}</span></th>
+            <th scope="row">${vowelSymbol(v)} <span class="small muted">${vowelWord(v)}</span></th>
             ${PRESETS.map((pr) => {
     const k = cellKey(v.id, pr.id, matrixZone);
     const r = p.ratings[k];
     const edited = p.overrides[k] && p.overrides[k].to;
-    return `<td><button class="cell${r ? ` r${r.r}` : ''}" data-action="cell" data-vowel="${v.id}" data-preset="${pr.id}"><span class="ipa">${esc(target(v, pr.id, matrixZone))}</span>${edited ? '<span class="edited" title="Von dir geändert">•</span>' : ''}${ratingMark(r)}</button></td>`;
+    return `<td><button class="cell${r ? ` r${r.r}` : ''}" data-action="cell" data-vowel="${v.id}" data-preset="${pr.id}">${soundHtml(target(v, pr.id, matrixZone))}${edited ? '<span class="edited" title="Von dir geändert">•</span>' : ''}${ratingMark(r)}</button></td>`;
   }).join('')}
           </tr>`).join('')}
         </tbody>`).join('')}
@@ -735,11 +756,12 @@ function openCell(vowelId, presetId) {
     return `${noteName(m)} ${n ? ratingMark(n) : '<span class="mark none">·</span>'}`;
   }).join(' · ');
   openDialog(`<form method="dialog" class="stack" id="cell-form" data-enter="cell-save" data-key="${esc(k)}" data-vowel="${v.id}" data-preset="${pr.id}">
-    <h2><span class="ipa">${v.ipa}</span> ${v.word}</h2>
-    <p class="muted small">${pr.name} · ${ZONE_NAMES[matrixZone]} ${zoneLabel(matrixZone)} · Startwert <span class="ipa">${esc(v.m[pr.id][matrixZone === 'z1' ? 0 : 1])}</span></p>
+    <h2>${vowelSymbol(v)} ${vowelWord(v)}</h2>
+    <p class="muted small">${pr.name} · ${ZONE_NAMES[matrixZone]} ${zoneLabel(matrixZone)} · Startwert ${soundInline(v.m[pr.id][matrixZone === 'z1' ? 0 : 1])}</p>
     <label class="field">Zielvokal<input id="cell-to" class="ipa" value="${esc(to)}" maxlength="24"></label>
     <p class="small" id="cell-plain">${describeTarget(to)}</p>
-    <div class="ipa-keys">${Object.keys(CHART).map((s) => `<button type="button" class="ipa" data-action="ipa" data-sym="${s}" title="${IPA[s] ? esc(IPA[s].like) : ''}">${s}</button>`).join('')}<button type="button" data-action="ipa" data-sym="–">–</button></div>
+    <p class="small muted">Das Feld nutzt Lautschrift. Tippe unten einen Klang an, ein Strich dazwischen heißt „zwischen beiden“.</p>
+    <div class="ipa-keys">${Object.keys(CHART).map((s) => `<button type="button" data-action="ipa" data-sym="${s}" aria-label="${s} wie ${esc(soundWord(s))}"><span class="ipa">${s}</span><span class="key-word">${esc(soundWord(s))}</span></button>`).join('')}<button type="button" data-action="ipa" data-sym="–">–</button></div>
     <label class="field">Eigene Notiz<textarea id="cell-note" rows="2" maxlength="300">${esc(o.note || '')}</textarea></label>
     <p class="small muted">Stand je Ton: ${noteMarks}</p>
     <div class="dialog-actions">
@@ -802,7 +824,7 @@ function historyView() {
     </div>
     <div>
       <h2 class="label">Kippt gerade</h2>
-      ${hard.length ? `<ul class="todo-list">${hard.slice(0, 8).map((h) => `<li><button class="todo" data-action="practice-one" data-vowel="${h.v.id}" data-preset="${h.pr.id}" data-zone="${zone}"><span class="ipa">${h.v.ipa}</span><span class="small muted">${h.v.word} · ${h.pr.name}</span><span class="to ipa">${esc(target(h.v, h.pr.id, zone))}</span></button></li>`).join('')}</ul>`
+      ${hard.length ? `<ul class="todo-list">${hard.slice(0, 8).map((h) => `<li><button class="todo" data-action="practice-one" data-vowel="${h.v.id}" data-preset="${h.pr.id}" data-zone="${zone}">${vowelSymbol(h.v)}<span class="small muted">${vowelWord(h.v)} · ${h.pr.name}</span><span class="to">${soundHtml(target(h.v, h.pr.id, zone))}</span></button></li>`).join('')}</ul>`
     : '<p class="small muted">Nichts in dieser Zone. Felder mit der Bewertung Kippt erscheinen hier zum direkten Üben.</p>'}
     </div>
     ${blindSection()}
@@ -810,7 +832,7 @@ function historyView() {
       <h2 class="label">Letzte Sessions</h2>
       ${log.length ? `<ul class="log">${log.slice(-10).reverse().map((l) => `<li>
         <span class="small tabular">${new Date(l.at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} · ${clock(l.ms)} · ${l.song ? `${esc(l.song)} · ` : ''}${presetById(l.preset).name} · ${ZONE_NAMES[l.zone]}</span>
-        <span class="small">${l.rated.map((d) => `<span class="ipa">${vowelById(d.id).ipa}</span> ${ratingMark({ r: d.r })}`).join(' ') || '<span class="muted">Ohne Bewertung</span>'}</span>
+        <span class="small">${l.rated.map((d) => `${vowelSymbol(vowelById(d.id))} <span class="muted">${vowelById(d.id).word}</span> ${ratingMark({ r: d.r })}`).join(' ') || '<span class="muted">Ohne Bewertung</span>'}</span>
       </li>`).join('')}</ul>` : '<p class="small muted">Noch keine Session. Nach der ersten erscheint sie hier.</p>'}
     </div>
   </section>`;
@@ -851,6 +873,10 @@ function profileView() {
           ${['cry', 'twang'].map((kind) => `<td>${radios(`lv-${pr.id}-${kind}`, LEVELS.map((l, i) => ({ value: i, label: l })), p.levels[pr.id][kind])}</td>`).join('')}
         </tr>`).join('')}</tbody>
       </table></div>
+    </div>
+    <div>
+      <h2 class="label">Lautschrift anzeigen</h2>
+      ${notationControls('p')}
     </div>
     <div>
       <h2 class="label">Technik</h2>
@@ -894,10 +920,14 @@ async function fillStorageInfo() {
 function openHelp() {
   openDialog(`<div class="stack">
     <h2>Zeichen und Begriffe</h2>
+    <p class="small">Du musst keine Lautschrift können. Unter „Nur Wörter“ kommt die App ohne Zeichen aus. Wer sie lernen möchte, schaltet auf „Zeichen + Wort“ und später auf „Nur Zeichen“.</p>
+    ${notationControls('h')}
+    <p class="small muted">Nur ${Object.values(IPA).filter((i) => i.hint).length} Zeichen sind neu, die anderen klingen fast wie geschrieben. ≈ heißt ungefähr.</p>
+    <div class="row"><button class="secondary" data-action="quiz-start">Zeichen üben, etwa eine Minute</button></div>
     <div class="table-wrap"><table class="help-table">
-      <thead><tr><th scope="col">Zeichen</th><th scope="col">Klingt wie</th><th scope="col">Mundgefühl</th><th scope="col">Hören</th><th scope="col">Eigene Probe</th></tr></thead>
+      <thead><tr><th scope="col">Zeichen</th><th scope="col">Englisch</th><th scope="col">Deutsch</th><th scope="col">Merkhilfe und Mundgefühl</th><th scope="col">Hören</th><th scope="col">Eigene Probe</th></tr></thead>
       <tbody>${Object.entries(IPA).map(([sym, i]) => `<tr>
-        <th scope="row"><span class="ipa">${sym}</span></th><td>${i.like}</td><td class="muted">${i.tip}</td>
+        <th scope="row"><span class="ipa">${sym}</span></th><td>${exampleWord(sym, 'en') || '–'}</td><td>${exampleWord(sym, 'de') || '–'}</td><td class="muted">${i.hint ? `<b>${i.hint}.</b> ` : ''}${glossProse(i.tip)}.</td>
         <td class="sample-cell"><button class="ghost small" data-action="hear" data-sym="${sym}">Wort</button> <button class="ghost small" data-action="hear-synth" data-sym="${sym}">Synth</button></td>
         <td class="sample-cell" data-sym="${sym}"></td>
       </tr>`).join('')}</tbody>
@@ -1532,9 +1562,10 @@ const actions = {
   'practice-one': (el) => startRun([el.dataset.vowel], el.dataset.preset, el.dataset.zone, 0, false),
   help: openHelp,
   hear(el) {
-    // Das deutsche Vergleichswort passt zur Tabelle, das englische springt ein, wenn es keines gibt.
+    // Zuerst das Wort in der gewaehlten Sprache, das andere springt ein, wenn es keines gibt.
     const i = IPA[el.dataset.sym];
-    const ok = (i.de && Sound.speak(i.de, 'de')) || (i.en && Sound.speak(i.en, 'en'));
+    const order = state.settings.exampleDe ? ['de', 'en'] : ['en', 'de'];
+    const ok = order.some((lang) => i[lang] && Sound.speak(i[lang], lang));
     if (!ok) $('help-msg').textContent = 'Auf diesem Gerät fehlt eine passende Stimme für diese Hörprobe. Chrome und Edge bringen englische Stimmen meist mit.';
   },
   check: openCheck,
@@ -1663,6 +1694,14 @@ document.addEventListener('change', async (e) => {
   if (t.id === 'tone-loop') { run.loop = t.checked; if (!t.checked) stopPlayback(); return; }
   if (t.id === 'drone') { p.session.drone = t.checked; save(); return; }
   if (t.name === 'set-volume') { save(); return; }
+  if ((t.name && t.name.endsWith('-notation')) || t.name === 'example-de') {
+    if (t.name === 'example-de') state.settings.exampleDe = t.checked;
+    else state.settings.notation = t.value;
+    save();
+    render();
+    if ($('dialog').open && $('help-msg')) openHelp();
+    return;
+  }
   if (t.name === 'set-autoplay') { state.settings.autoplay = t.checked; save(); return; }
   if (t.name && t.name.endsWith('-timbre')) {
     state.settings.timbre = t.value;

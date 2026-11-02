@@ -64,7 +64,7 @@ async function startSample(sym) {
   const session = { sym, startedAt: performance.now() };
   session.limit = setTimeout(() => { if (sampleRec === session) stopSample(); }, 10000);
   sampleRec = session;
-  msg.textContent = `Aufnahme läuft: Singe ${sym} locker und gehalten. Tippe danach auf Stopp.`;
+  msg.textContent = `Aufnahme läuft: Singe ${sym} wie ${likeWord(sym)} locker und gehalten. Tippe danach auf Stopp.`;
   fillSamples();
   const blob = await finished;
   clearTimeout(session.limit);
@@ -208,6 +208,40 @@ function blindSection() {
   </div>`;
 }
 
+/* ---------- Zeichen ueben ---------- */
+
+const QUIZ_SIZE = 8;
+let quiz = null;
+
+function quizOptions(sym) {
+  return shuffled([sym, ...shuffled(Object.keys(IPA).filter((s) => s !== sym)).slice(0, 2)]);
+}
+
+function renderQuiz() {
+  if (quiz.index >= quiz.items.length) {
+    openDialog(`<div class="stack">
+      <h2>${quiz.right} von ${quiz.items.length} erkannt</h2>
+      <p class="small muted">Wenige Runden reichen. Wenn dir die Zeichen vertraut sind, stell die Anzeige auf „Nur Zeichen“.</p>
+      <div class="dialog-actions">
+        <button class="ghost" data-action="help">Zurück zur Hilfe</button>
+        <button class="primary" data-action="quiz-start">Noch eine Runde</button>
+      </div></div>`);
+    return;
+  }
+  const sym = quiz.items[quiz.index];
+  const done = quiz.picked !== null;
+  openDialog(`<div class="stack">
+    <h2>Wie klingt dieses Zeichen?</h2>
+    <p class="small muted">Zeichen ${quiz.index + 1} von ${quiz.items.length}</p>
+    <p class="quiz-symbol ipa">${sym}</p>
+    <div class="blind-options">
+      ${quiz.options.map((s) => `<button class="${done && s === sym ? 'primary' : 'ghost'}" data-action="quiz-pick" data-sym="${s}"${done ? ' disabled' : ''}>${esc(soundWord(s))}</button>`).join('')}
+    </div>
+    ${done ? `<p class="small" aria-live="polite">${quiz.picked === sym ? 'Richtig.' : `Das Zeichen klingt wie ${esc(likeWord(sym))}.`} ${IPA[sym].hint}.</p>
+    <div class="dialog-actions"><button class="primary" data-action="quiz-next">Weiter</button></div>` : ''}
+  </div>`);
+}
+
 /* ---------- Komplett-Backup ---------- */
 
 // Dateiaufbau: Kennung, 4 Byte Laenge, Manifest als JSON, danach alle Audiodaten am Stueck.
@@ -314,6 +348,25 @@ Object.assign(actions, {
     }
   },
   'play-contrast': playContrast,
+  'quiz-start'() {
+    const items = shuffled(Object.keys(IPA).filter((s) => IPA[s].hint)).slice(0, QUIZ_SIZE);
+    quiz = { items, index: 0, right: 0, picked: null, options: quizOptions(items[0]) };
+    renderQuiz();
+  },
+  'quiz-pick'(el) {
+    const sym = quiz.items[quiz.index];
+    quiz.picked = el.dataset.sym;
+    if (quiz.picked === sym) quiz.right += 1;
+    const lang = state.settings.exampleDe && IPA[sym].de ? 'de' : IPA[sym].en ? 'en' : 'de';
+    if (IPA[sym][lang]) Sound.speak(IPA[sym][lang], lang);
+    renderQuiz();
+  },
+  'quiz-next'() {
+    quiz.index += 1;
+    quiz.picked = null;
+    if (quiz.index < quiz.items.length) quiz.options = quizOptions(quiz.items[quiz.index]);
+    renderQuiz();
+  },
   async 'blind-start'() {
     const items = await blindItems();
     if (items.length < 2) {

@@ -1,7 +1,7 @@
 'use strict';
 // Netzwerk zuerst, damit Updates sofort ankommen. Ohne oder mit sehr langsamem Netz startet die App aus dem Cache.
-const CACHE = 'vokaltrainer-v6';
-const FILES = ['./', 'index.html', 'styles.css', 'data.js', 'audio.js', 'pitch.js', 'app.js', 'songs.js', 'extras.js', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'vokaltrainer-v7';
+const FILES = ['./', 'index.html', 'styles.css', 'data.js', 'audio.js', 'pitch.js', 'laute.js', 'app.js', 'songs.js', 'extras.js', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const NETWORK_WAIT = 3000;
 

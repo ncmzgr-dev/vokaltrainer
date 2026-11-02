@@ -286,7 +286,7 @@ function spotRow(song, spot) {
   return `<li class="spot">
     <div class="spot-main">
       <b>${esc(spot.word)}</b>
-      <span class="ipa">${v.ipa}</span><span class="muted" aria-hidden="true">→</span><span class="ipa to">${esc(to)}</span>
+      ${vowelSymbol(v)}<span class="muted" aria-hidden="true">→</span><span class="to">${soundHtml(to)}</span>
       <span class="small muted tabular">${noteName(sung)}</span>
       ${spot.rating ? ratingMark(spot.rating) : ''}
       ${spot.guessed ? '<span class="small badge-soft" title="Der Vokal wurde aus der Schreibweise geschätzt">Vokal prüfen</span>' : ''}
@@ -318,7 +318,7 @@ function songDetailView(song) {
         <select id="song-transpose">${transposeOptions(song.transpose)}</select>
       </label>
     </div>
-    <p class="small muted">${pr.direction}. Die Transposition verschiebt alle Stellen in deine Tonart.</p>
+    <p class="small muted">${glossProse(pr.direction)}. Die Transposition verschiebt alle Stellen in deine Tonart.</p>
     <div class="row">
       <button class="primary big" data-action="practice-song"${song.spots.length ? '' : ' disabled'}>Alle Stellen üben</button>
     </div>
@@ -349,7 +349,7 @@ function openSpot(song, spot) {
     <label class="field">Textstelle (optional)<input id="spot-line" value="${esc(spot ? spot.line : '')}" maxlength="120" autocomplete="off"></label>
     <div class="form-grid">
       <label class="field">Ton im Original<select id="spot-midi">${noteOptions(midi)}</select></label>
-      <label class="field">Vokal<select id="spot-vowel">${VOWELS.map((v) => `<option value="${v.id}"${spot && spot.vowelId === v.id ? ' selected' : ''}>${v.ipa} wie ${v.word}</option>`).join('')}</select></label>
+      <label class="field">Vokal<select id="spot-vowel">${VOWELS.map((v) => `<option value="${v.id}"${spot && spot.vowelId === v.id ? ' selected' : ''}>${vowelOption(v)}</option>`).join('')}</select></label>
     </div>
     <p class="small muted" id="spot-hint">${spot ? '' : 'Der Vokal wird beim Tippen aus dem Wort geschätzt. Prüfe den Vorschlag.'}</p>
     <div class="dialog-actions">
