@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vokaltrainer</title>
+<meta name="theme-color" content="#0b6e78">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vokale">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gentium+Book+Plus:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <span class="brand"><span class="ipa">ʌ→ʊ</span> <span class="brand-text">Vokaltrainer</span></span>
+  <nav id="nav" aria-label="Hauptbereiche">
+    <button data-view="ueben">Üben</button>
+    <button data-view="songs">Songs</button>
+    <button data-view="matrix">Matrix</button>
+    <button data-view="verlauf">Verlauf</button>
+    <button data-view="profil">Profil</button>
+  </nav>
+  <div class="top-end">
+    <button class="ghost help-btn" data-action="help" aria-label="Hilfe öffnen">?</button>
+    <label class="profile-pick"><span class="sr">Aktives Profil</span><select id="profile-select"></select></label>
+  </div>
+</header>
+<main id="app"></main>
+<dialog id="dialog"></dialog>
+<script src="data.js"></script>
+<script src="audio.js"></script>
+<script src="pitch.js"></script>
+<script src="app.js"></script>
+<script src="songs.js"></script>
+<script src="extras.js"></script>
+</body>
+</html>
